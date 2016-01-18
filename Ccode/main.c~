@@ -1,0 +1,125 @@
+#include "declaration.h"
+#include "input.h"
+#include "alloc_bays.h"
+#include "info/dock_info.h"
+#include "info/truck_info.h"
+#include "info/process_info.h"
+
+int main(int argc, char * argv[]){
+	if(argc > 2)
+		prompt();
+	else
+		init_dock_info();
+
+	init_trucks();
+	check_identical_trucks();
+
+	handling_units_sort();
+	alloc_bays(&(dock_info.bays));
+	
+	len_sort();
+	ex_py();	
+	destroy_truck_list();
+	destroy_dock();
+
+}
+
+
+void print_data(FILE * out){
+	print_dock_info(out);
+	print_trucks_info(out);
+	fprintf(out, "FINISHED\n");
+	fflush(NULL);
+}
+
+
+void print_dock_info(FILE * out){
+	fprintf(out, "%s\n", dock_info.terminal);
+	
+	fprintf(out, "%i\n", dock_info.doors);
+
+	island * is = dock_info.islands;
+	while(is != NULL){
+		fprintf(out, "%i\n", is->bay);
+		fprintf(out, "%s\n", is->location);
+		fprintf(out, "%s\n", is->orientation);
+		is = is->next;
+	}
+	fprintf(out, "END\n");
+	
+	scale * sc = dock_info.scales;
+	while(sc != NULL){
+		fprintf(out, "%i\n", sc->bay);
+		fprintf(out, "%s\n", sc->location);
+		sc = sc->next;
+	}
+	fprintf(out, "END\n");
+	
+	int bay_max = num_bays(dock_info.doors);
+	int i = 0;
+	for(; i < bay_max; i++){
+		//fprintf(out, "%s\n", (dock_info.bays + i)->id);
+		fprintf(out, "%i\n", i);
+	}
+	fprintf(out, "END\n");
+}
+
+
+void print_trucks_info(FILE * out){
+	truck_info * truck = trucks;
+	int i = 0;
+	for(; i < num_trucks; i++){
+	
+		fprintf(out, "%s\n", truck->dest);
+	
+		fprintf(out, "%d\n", truck->handling_units);
+	
+		fprintf(out, "%li\n", truck->weight);
+	
+		fprintf(out, "%i\n", truck->head);
+	
+		fprintf(out, "%i\n", truck->tail);
+		
+		door_number * door = truck->doors;
+		while(door != NULL){
+			fprintf(out, "%i\n", door->door);
+			door = door->next;
+		}
+		fprintf(out, "END\n");
+		
+		destination * dest = truck->destinations;
+		while(dest != NULL){
+			fprintf(out, "%s\n", dest->dest);
+			dest = dest->next;
+		}
+		fprintf(out, "END\n");
+		truck++;
+	}
+}
+
+
+void ex_py(){
+	int comm[2];
+	pipe(comm);
+	//FILE * file = fopen("../PYcode/test.txt", "w");
+	print_data(fdopen(comm[WRITE], "w"));
+	//print_data(file);
+	//fclose(file);
+	//fflush(NULL);
+	pid_t child = fork();
+	if(child == 0){
+		close(comm[WRITE]);
+ 		dup2(comm[READ], fileno(stdin));
+		execl("py", "py", "NULL", "D", NULL); //helloworld.py DAN D", NULL);
+		printf("Execute failed\n");
+		exit(0); 
+	}
+	int stat = 0;	
+	close(comm[WRITE]);
+	close(comm[READ]);
+	waitpid(child, &stat, WIFEXITED(stat));
+
+
+}
+	
+	

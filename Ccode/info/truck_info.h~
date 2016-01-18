@@ -1,0 +1,293 @@
+
+void init_trucks(){
+	FILE * file = fopen("../Info/Load_Plan.txt", "r");
+	if(file == NULL){
+		fprintf(stderr, "Failed to open Load_Plan.txt in truck_info.h at line %i\n", __LINE__);
+		exit(1);
+	}
+	
+	num_trucks = get_lines(file);
+	
+	trucks = calloc(sizeof(truck_info), num_trucks + 1);
+	truck_info * cur_truck = trucks;
+	
+
+	
+	char * line = "";
+	size_t size = 0;
+	int count = 0;
+	while(getline(&line, &size, file) != EOF){
+		destination * head, * cur_head;
+		destination * tail, * cur_tail;
+		destination * center, * cur_center;
+		head = tail = center = cur_head = cur_tail = cur_center = NULL;
+		
+
+		//Retrieve truck destination
+		char * start = line;
+		char * end = strstr(start, ":");
+		*end = '\0';
+		strcpy(cur_truck->dest, start);
+		
+		//Retrieve truck door
+		start = &end[1];
+		end = strstr(start, ":");
+		*end = '\0';
+		add_door(cur_truck, atoi(start));
+		
+		//Docked or Out
+		if(end[2] == 'D')
+			cur_truck->docked = 1;
+		else
+			cur_truck->docked = 0;
+	
+		//Retrieve freight destinations
+		start = &end[4];
+		while((end = strstr(start, "/")) != NULL){
+				start = &start[1];
+				*end = '\0';
+				if(strlen(start) == 3){
+					if(center == NULL)
+						cur_center = center = save_dest(cur_truck, &center, &cur_center, start);
+					else
+						cur_center = cur_center->next = save_dest(cur_truck, &center, &cur_center, start);
+					start = end;
+				}
+				else if(strstr(start, "Tail") == &start[3]){
+					start[3] = '\0';
+					if(tail == NULL)
+						cur_tail = tail = save_dest(cur_truck, &tail, &cur_tail, start);
+					else
+						cur_tail = cur_tail->next = save_dest(cur_truck, &tail, &cur_tail, start);
+					cur_truck->tail++;
+					start = end;
+				}
+				else if(strstr(start, "Head") == &start[3]){
+					start[3] = '\0';
+					if(head == NULL)
+						cur_head = head = save_dest(cur_truck, &head, &cur_head, start);
+					else
+						cur_head = cur_head->next = save_dest(cur_truck, &head, &cur_head, start);
+					cur_truck->head++;
+					start = end;
+				}
+				*start = ' ';
+		}
+		
+		if(head != NULL)
+			cur_truck->destinations = head;
+		
+		if(center != NULL){
+			if(head == NULL)
+				cur_truck->destinations = center;
+			else
+				cur_head->next = center;
+		}
+		
+		if(tail != NULL){
+			if(cur_truck->destinations == NULL)
+				cur_truck->destinations = tail;
+			else if(center == NULL)
+				cur_head->next = tail;
+			else
+				cur_center->next = tail;
+		}
+		cur_truck += 1;
+	}
+	free(line);
+	fclose(file);
+	init_freight_data();
+}
+
+
+destination * save_dest(truck_info * truck, destination ** head, destination ** cur, char dest[4]){
+	destination * fresh = malloc(sizeof(destination));
+	fresh->next = NULL;
+
+	strcpy(fresh->dest, dest);
+	return fresh;
+}
+
+
+void print_truck_info(){
+	truck_info * cur;
+	int i = 0;
+	for(; i < num_trucks; i++){
+		cur = trucks + i;
+		char * door = door_string(cur);
+		printf("Truck Destination: %s at door %s and is currently %sdocked\n", cur->dest, door, (cur->docked ? "": "not "));
+		printf("Weight: %li \t Handling Units: %i\n", cur->weight, cur->handling_units);
+		printf("Head count: %i \tTail count: %i\n", cur->head, cur->tail);
+		printf("List of freight destinations:\n");
+		free(door);
+		print_dest_list(cur->destinations);
+		printf("\n\n");
+	}
+}
+
+char * door_string(truck_info * truck){
+	char * doors = malloc(1000);
+	strcpy(doors, "");
+	door_number * cur_door = truck->doors;
+	while(cur_door != NULL){
+		if(cur_door->door){
+			char num[10];
+			sprintf(num, "%i/", cur_door->door);
+			strcat(doors, num);
+			cur_door = cur_door->next;
+		}
+	} 
+	return doors;
+}
+void print_dest_list(destination * d){
+	int count =1;
+	while(d != NULL){
+		printf("%s%s", d->dest, (count % 3 == 0  ? "\n": "\t"));
+		count++;
+		d = d->next;
+	}
+}
+
+
+int get_lines(FILE * file){
+	long location = ftell(file);
+	char * line = "";
+	size_t size = 0;
+	int lines = 0;
+	while(getline(&line, &size, file) !=EOF)
+		lines++;
+	fseek(file, location, SEEK_SET);
+	free(line);
+	return lines;
+}
+
+
+void destroy_truck_list(){
+	int i = 0;
+	truck_info * cur_truck = trucks; 
+	for(; i < num_trucks; i++){
+		destroy_truck(cur_truck);
+		cur_truck++;
+	}
+	free(trucks);
+}
+
+
+void destroy_truck(truck_info * cur_truck){
+			destroy_door_list(cur_truck->doors);
+			cur_truck->doors = NULL;
+	
+			destroy_dest_list(cur_truck->destinations);
+			cur_truck->destinations = NULL;
+}
+
+
+void destroy_door_list(door_number * doors){
+	if(doors == NULL)
+		return;
+	destroy_door_list(doors->next);
+	free(doors);
+}	
+
+
+void destroy_dest_list(destination * cur){
+	if(cur == NULL)
+		return;
+	destroy_dest_list(cur->next);
+	free(cur);
+}
+
+
+void init_freight_data(){
+	FILE * file = fopen("../Info/incoming.txt", "r");
+	if(file == NULL){
+		fprintf(stderr, "Failed to open incoming.txt in truck_info.h at line %i\n", __LINE__);
+		exit(1);
+	}
+	int quantity = get_lines(file);
+	freight fre_array[quantity];
+	
+	char * line = "";
+	size_t size = 0;
+	while(getline(&line, &size, file) != EOF){
+		//Retruieve destination
+		char dest[4];
+		line[3] = '\0';
+		strcpy(dest, line);
+		
+		//Retrieve weight
+		char * start = &line[5];
+		char * end = strstr(start, "/");
+		*end = '\0';
+		long weight = atol(start);
+		
+		//Retrieve handeling units;
+		start = &end[1];
+		end = strstr(start, "\n");
+		*end = '\0';
+		int handling_units = atoi(start);
+
+		//Search each trucks destination list;
+		char locs[1000];
+		strcpy(locs, "");
+		int occurences = 0;
+		int i = 0;
+		for(; i < num_trucks; i ++){
+			truck_info * cur_truck = trucks + i;
+			destination * t_dest = cur_truck->destinations;
+			while(t_dest != NULL){
+				if(!strcmp(dest, t_dest->dest)){
+					cur_truck->weight += weight;
+					cur_truck->handling_units += handling_units;
+					occurences++;
+					strcat(locs, " ");
+					strcat(locs, cur_truck->dest);
+				}
+				t_dest = t_dest->next;
+			}
+		}
+		/*if(occurences == 0)
+			printf("Destination %s is unaccounted for in the load plan\n", dest);
+		if(occurences > 1)
+			printf("Destination %s is on the load plan of the following trucks: %s\n", dest, locs);*/
+	}
+	free(line);
+	fclose(file);
+}
+
+void add_door(truck_info * truck, int door_num){
+	door_number * door = truck->doors;
+	while(door != NULL && door->next != NULL)
+		door = door->next;
+	
+	if(truck->doors == NULL){
+		truck->doors = malloc(sizeof(door_number));
+		truck->doors->door = door_num;
+		truck->doors->next = NULL;
+	}
+	else{
+		door->next = malloc(sizeof(door_number));
+		door->next->door = door_num;
+		door->next->next = NULL;
+	}
+}
+
+
+///Changed the door format to a linked list you need to finish the job.
+
+
+		
+
+
+
+
+
+
+
+
+
+
+
+
+
+

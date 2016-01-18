@@ -1,0 +1,15 @@
+//Number trailer doors on the dock
+Doors: 32
+
+//Which bay the island is in as well as its location within  the bay and its orientation
+//Format (baynumber)/(location within bay)/(orientation of island intrance),
+//Location within bay: T or Top, M or Middle, B or Bottom
+//Orientation: U or Up, D or Down
+//Place a space inbetween each entry and remember to put a comma at the end
+Islands: 4/Middle/Down, 5/Middle/Up,
+
+//Whick bay the scale is in aswell as its location within the bay
+//Format (baynumber)/(location within bay),
+//Location within bay: T or Top, M or Middle, B or Bottom
+//Place a space inbetween each entry and remember to put a comma at the end
+Scales: 20/Top, 4/Top, 4/Bottom, 5/Top, 5/Bottom,
